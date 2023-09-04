@@ -1,0 +1,187 @@
+<html>
+<head>
+<script src="elo.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", async function() {
+    const response = await fetch("sentences.json");
+    const data = await response.json();
+
+    let i;
+    let lang;
+    let sentences;
+
+    async function next() {
+        i += 1;
+
+        if (i == sentences.length) {
+            document.getElementById("original").textContent = "";
+            document.getElementById("first").textContent = "";
+            document.getElementById("second").textContent = "";
+            document.getElementById("container").style.display = "none";
+
+            const elo = new ELO();
+            let rating1 = 1000;
+            let rating2 = 1000;
+            for (let j = 0; j < sentences.length; j++) {
+                switch (sentences[j].choice) {
+                    case 0:
+                        rating1 = elo.newRatingIfTied(rating1, rating2);
+                        rating2 = elo.newRatingIfTied(rating2, rating1);
+                        break;
+
+                    case 1:
+                        rating1 = elo.newRatingIfWon(rating1, rating2);
+                        rating2 = elo.newRatingIfLost(rating2, rating1);
+                        break;
+
+                    case 2:
+                        rating1 = elo.newRatingIfLost(rating1, rating2);
+                        rating2 = elo.newRatingIfWon(rating2, rating1);
+                        break;
+
+                    default:
+                        throw new Error("Unexpected choice");
+                }
+            }
+
+            const first_wins = sentences.reduce((acc, sentence) => {
+                if (sentence.choice == 1) {
+                    return acc + 1;
+                } else {
+                    return acc;
+                }
+            }, 0);
+            const second_wins = sentences.reduce((acc, sentence) => {
+                if (sentence.choice == 2) {
+                    return acc + 1;
+                } else {
+                    return acc;
+                }
+            }, 0);
+            const ties = sentences.reduce((acc, sentence) => {
+                if (sentence.choice == 0) {
+                    return acc + 1;
+                } else {
+                    return acc;
+                }
+            }, 0);
+            const agreement = (100 * sentences.reduce((acc, sentence) => {
+                if (sentence.choice == sentence.llm_choice) {
+                    return acc + 1;
+                } else {
+                    return acc;
+                }
+            }, 0) / sentences.length).toFixed(1);
+
+            document.getElementById("result").textContent = `First won ${first_wins} times, second won ${second_wins} times, they tied ${ties} times. Elo rating for first is ${rating1}, elo rating for second is ${rating2}. A LLM agreed ${agreement}% with you`;
+            console.log(sentences);
+            return;
+        }
+
+        let sentence = sentences[i];
+        document.getElementById("original").textContent = sentence["original"];
+        if (Math.random() < 0.5) {
+            document.getElementById("first").textContent = sentence["first"];
+            document.getElementById("second").textContent = sentence["second"];
+        } else {
+            document.getElementById("first").textContent = sentence["second"];
+            document.getElementById("second").textContent = sentence["first"];
+        }
+    }
+
+    async function start() {
+        document.getElementById("container").style.display = "block";
+        document.getElementById("result").textContent = "";
+        sentences = data[lang].slice();
+        i = -1;
+        await next();
+    }
+
+    document.getElementById("buttonStart").addEventListener("click", async function() {
+        const langEl = document.getElementById("lang");
+        lang = langEl.value;
+        await start();
+    });
+
+    async function choose(choice) {
+        if (i == sentences.length) {
+            return;
+        }
+
+        if (choice == 0) {
+            sentences[i].choice = 0;
+        } else if (choice == 1) {
+            if (document.getElementById("first").textContent == sentences[i]["first"]) {
+                sentences[i].choice = 1;
+                console.log(`${sentences[i]["first"]} is better`);
+            } else if (document.getElementById("first").textContent == sentences[i]["second"]) {
+                sentences[i].choice = 2;
+                console.log(`${sentences[i]["second"]} is better`);
+            } else {
+                throw new Error("Unexpected value");
+            }
+        } else if (choice == 2) {
+            console.log(document.getElementById("second").textContent);
+            console.log(sentences[i]["first"]);
+            console.log(sentences[i]["second"]);
+            if (document.getElementById("second").textContent == sentences[i]["first"]) {
+                sentences[i].choice = 1;
+                console.log(`${sentences[i]["first"]} is better`);
+            } else if (document.getElementById("second").textContent == sentences[i]["second"]) {
+                sentences[i].choice = 2;
+                console.log(`${sentences[i]["second"]} is better`);
+            } else {
+                throw new Error("Unexpected value");
+            }
+        } else {
+            throw new Error("Unexpected choice");
+        }
+
+        await next();
+    }
+
+    document.getElementById("buttonSame").addEventListener("click", async function() {
+        await choose(0);
+    });
+
+    document.getElementById("buttonFirst").addEventListener("click", async function() {
+        await choose(1);
+    });
+
+    document.getElementById("buttonSecond").addEventListener("click", async function() {
+        await choose(2);
+    });
+});
+</script>
+</head>
+<body>
+<select id="lang">
+    <option value="it">Italian</option>
+    <option value="es">Spanish</option>
+    <option value="fr">French</option>
+</select>
+<button id="buttonStart">Start</button>
+<hr>
+<div id="container" style="display:none;">
+<table border="1" style="border-spacing: 10px;">
+<tr>
+<td><b>Sentence</b></td>
+<td><span id="original"></span></td>
+</tr>
+<tr>
+<td><b>First Translation</b></td>
+<td><span id="first"></span></td>
+</tr>
+<tr>
+<td><b>Second Translation</b></td>
+<td><span id="second"></span></td>
+</tr>
+</table>
+<hr>
+<button id="buttonSame">About the same</button>
+<button id="buttonFirst">First is better</button>
+<button id="buttonSecond">Second is better</button>
+</div>
+<div id="result"></div>
+</body>
+</html>
