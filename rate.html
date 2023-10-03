@@ -1,0 +1,126 @@
+<html>
+<head>
+<script>
+document.addEventListener("DOMContentLoaded", async function() {
+    const response = await fetch("sentences.json");
+    const data = await response.json();
+
+    let i;
+    let alternative;
+    let lang;
+    let sentences;
+
+    async function next() {
+        const not_dones = [];
+        
+        for (const [index, sentence] of sentences.entries()) {
+            for (let j = 0; j < sentence.scores.length; j++) {
+                if (sentence.scores[j] === null) {
+                    not_dones.push([index, j]);
+                }
+            }
+        }
+
+        if (not_dones.length === 0) {
+            document.getElementById("original").textContent = "";
+            document.getElementById("translation").textContent = "";
+            document.getElementById("container").style.display = "none";
+
+            document.getElementById("result").textContent = `Thanks! Check back in a few days to find other sentences to rate!`;
+            return;
+        }
+
+        const not_done = not_dones[Math.floor(Math.random() * not_dones.length)];
+        i = not_done[0];
+        alternative = not_done[1];
+
+        let sentence = sentences[i];
+        document.getElementById("original").textContent = sentence["original"];
+        document.getElementById("translation").textContent = sentence[alternative === 0 ? "first" : "second"];
+    }
+
+    async function start() {
+        document.getElementById("container").style.display = "block";
+        document.getElementById("result").textContent = "";
+        let storedSentences = localStorage.getItem(`${lang}-sentences`);
+        sentences = storedSentences ? JSON.parse(storedSentences) : data[lang];
+        await next();
+    }
+
+    const langEl = document.getElementById("lang");
+    lang = langEl.value;
+    langEl.addEventListener("change", async function() {
+        lang = langEl.value;
+        await start();
+    });
+
+    const score = document.getElementById("score");
+
+    function resetScore() {
+        score.value = 50;
+    }
+
+    document.getElementById("buttonStart").addEventListener("click", async function() {
+        resetScore();
+        await start();
+    });
+
+    document.getElementById("next").addEventListener("click", async function() {
+        sentences[i].scores[alternative] = Number(score.value);
+
+        // POST all sentences somewhere
+        console.log(sentences);
+        localStorage.setItem(`${lang}-sentences`, JSON.stringify(sentences));
+
+        await next();
+
+        resetScore();
+    });
+
+    document.getElementById("download").addEventListener("click", function() {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(
+            new Blob([localStorage.getItem(`${lang}-sentences`)], {type:"application/json"})
+        );
+        a.download = `${lang}-results.json`;
+        a.click();
+    });
+});
+</script>
+</head>
+<body>
+<select id="lang">
+    <option value="it">Italian</option>
+    <option value="es">Spanish</option>
+    <option value="fr">French</option>
+    <option value="cs">Czech</option>
+</select>
+<button id="buttonStart">Start</button>
+<button id="download">Download results</button>
+<hr>
+<div id="container" style="display:none;">
+How accurately does the translated sentence express the meaning of the source sentence?
+<br /><br />
+<table border="1" style="border-spacing: 10px;">
+<tr>
+<td><b>Sentence</b></td>
+<td><span id="original"></span></td>
+</tr>
+<tr>
+<td><b>Translation</b></td>
+<td><span id="translation"></span></td>
+</tr>
+</table>
+<br />
+<input type="range" id="score" name="score" list="values" style="width: 400px;" />
+<datalist id="values">
+    <option value="25" label="25"></option>
+    <option value="50" label="50"></option>
+    <option value="75" label="75"></option>
+</datalist>
+<hr>
+<button id="next">Next</button>
+</div>
+<div id="result"></div>
+</body>
+</html>
