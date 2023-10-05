@@ -21,6 +21,9 @@ document.addEventListener("DOMContentLoaded", async function() {
             }
         }
 
+        document.getElementById("current_sentence_number").textContent = sentences.length * 2 - not_dones.length;
+        document.getElementById("total_sentence_number").textContent = sentences.length * 2;
+
         if (not_dones.length === 0) {
             document.getElementById("original").textContent = "";
             document.getElementById("translation").textContent = "";
@@ -120,6 +123,8 @@ How accurately does the translated sentence express the meaning of the source se
 </datalist>
 <hr>
 <button id="next">Next</button>
+<br /><br />
+Progress: <span id="current_sentence_number"></span> out of <span id="total_sentence_number"></span>
 </div>
 <div id="result"></div>
 </body>
